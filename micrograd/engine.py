@@ -51,7 +51,7 @@ class Value:
 
         return out
 
-    def backward(self):
+    def backward(self, out_grad=1):
         # topological order all of the children in the graph
         topo = []
         visited = set()
@@ -69,7 +69,7 @@ class Value:
         # go one variable at a time and apply the chain rule to get its gradient
         # Making grad a `Value` type allows us to track backprop and do higher
         # order gradients.
-        self.grad = Value(1)
+        self.grad = out_grad
         for v in reversed(topo):
             v._backward()
 
