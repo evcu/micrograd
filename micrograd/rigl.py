@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 def top_k_param_dict(param_tuples, k, sort_fn=lambda p: abs(p.data)):
     # The list has (param, index, ..) tuples, so we apply function to the param.
     key_fn = lambda tp: sort_fn(tp[0])
@@ -99,3 +101,22 @@ def rigl_update_model(model, update_fraction=0.3):
         del model.layers[k].neurons[j].w[i]
         p.data = 0.
         model.layers[k_new].neurons[j_new].w[i_new] = p
+
+def strip_deadneurons(model):
+  new_model = deepcopy(model)
+  for layer, next_layer in zip(new_model.layers[:-1], new_model.layers[1:]):
+    active_neurons = set()
+    for neuron in next_layer.neurons:
+      active_neurons.update(list(neuron.w.keys()))
+    # remove the neuron and remember the old ids.
+    new_neurons = []
+    new_neuron_id_mapping = {}
+    for i, neuron in enumerate(layer.neurons):
+      if neuron.w and i in active_neurons:
+        new_neuron_id_mapping[i] = len(new_neurons)
+        new_neurons.append(neuron)
+    layer.neurons = new_neurons
+    # Remove weights that originate from removed neurons replace ids of the remaining ones.
+    for i, neuron in enumerate(next_layer.neurons):
+      neuron.w = {new_neuron_id_mapping[k]: v for k, v in neuron.w.items() if k in new_neuron_id_mapping}
+  return new_model
