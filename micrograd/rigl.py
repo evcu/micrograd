@@ -35,33 +35,37 @@ def rigl_update_neuron(model, update_fraction=0.3):
             neuron.zero_ws = {}
 
 def rigl_update_layer(model, update_fraction=0.3):
+    # (1) Calculating dense gradient
     total_loss, acc = loss(model, dense_grad=True)
-    # backward
     model.zero_grad()
     total_loss.backward()
 
     for layer in model.layers:
         n_weights = 0
-        zero_params, params = [], []
+        # (2) For each layer obtain existing and candidate parameters.
+        candidate_params, params = [], []
         for j, neuron in enumerate(layer.neurons):
             n_weights += len(neuron.w)
             # Decide connections to grow (pick top gradient magnitude).
-            zero_params.extend([(p, i, j)  for i, p in neuron.zero_ws.items()])
+            candidate_params.extend([(p, i, j)  for i, p in neuron.zero_ws.items()])
             params.extend([(p, i, j)  for i, p in neuron.w.items()])
-            # Done with zero_params delete them.
+            # Done with zero_ws delete them.
             neuron.zero_ws = {}
+
+        # (3) If no parameters to update, skip this layer
         n_update = math.floor(n_weights * update_fraction)
         if n_update == 0:
             # Not updating
             continue
 
+        # (4) Obtain candidate connections with highest gradient magnitude.
         top_grad_fn = lambda p: abs(p.grad)
-        top_k_zero_params = top_k_param_dict(zero_params, n_update, sort_fn=top_grad_fn)
-        # Find connections to drop (pick least magnitude).
+        top_k_candidate_params = top_k_param_dict(candidate_params, n_update, sort_fn=top_grad_fn)
+        # (5) Obtain existing connections with lowest magnitude.
         least_magnutide_fn = lambda p: -abs(p.data)
         bottom_k_params = top_k_param_dict(params, n_update, sort_fn=least_magnutide_fn)
-        for (p, i, j), (_, i_new, j_new) in zip(bottom_k_params, top_k_zero_params):
-            # Update weights
+        # (6) Replace least magnitude connections with new ones with high expected gradient.
+        for (p, i, j), (_, i_new, j_new) in zip(bottom_k_params, top_k_candidate_params):
             del layer.neurons[j].w[i]
             p.data = 0.
             layer.neurons[j_new].w[i_new] = p

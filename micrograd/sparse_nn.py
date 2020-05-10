@@ -1,3 +1,5 @@
+from micrograd.nn import Module
+
 class SparseNeuron(Module):
 
     def __init__(self, nin, sparsity, nonlin=True):
