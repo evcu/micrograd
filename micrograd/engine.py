@@ -40,8 +40,11 @@ class Value:
         assert isinstance(other, (int, float)), "only supporting int/float powers for now"
         out = Value(self.data**other, (self,), f'**{other}')
 
-        def _backward():
-            self.grad += (other * self.data**(other-1)) * out.grad
+        def _backward(keep_graph=False):
+            if keep_graph:
+                self.grad += (other * self**(other-1)) * out.grad
+            else:
+                self.grad += (other * self.data**(other-1)) * out.grad
         out._backward = _backward
 
         return out
@@ -55,7 +58,7 @@ class Value:
 
         return out
 
-    def backward(self):
+    def backward(self, keep_graph=False):
         # topological order all of the children in the graph
         topo = []
         visited = set()
@@ -70,9 +73,9 @@ class Value:
                 topo.append(v)
         build_topo(self)
 
-        # go one variable at a time and apply the chain rule to get its gradient
-        # Making grad a `Value` type allows us to trackprop and do
-        self.grad = Value(1)
+        # Making grad a `Value` type allows us to track backprop and do higher
+        # order gradients.
+        self.grad = Value(1) if keep_graph else 1
         for v in reversed(topo):
             v._backward(keep_graph=keep_graph)
 
